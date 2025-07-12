@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Padel Players Dashboard</title>
+
+<style>
+  :root{--primary:#1e90ff;--accent:#f0f8ff;--bg-start:#e0f7ff;--bg-end:#ffffff;}
+  body{
+    font-family:"Segoe UI",Arial,sans-serif;margin:0;padding:2rem;color:#334155;
+    background:linear-gradient(135deg,var(--bg-start)0%,var(--bg-end)100%);
+    background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.07)0 2px,transparent 2px 4px);
+  }
+  h1{
+    text-align:center;margin-bottom:1.5rem;font-size:2.2rem;
+    background:linear-gradient(90deg,var(--primary)0%,#38bdf8 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  }
+
+  /* NAV buttons */
+  .nav-btn, .admin-btn{
+    display:inline-block;margin:0 0 2rem 0;padding:.55rem 1rem;
+    background:#64748b;color:#fff;text-decoration:none;border:none;border-radius:.55rem;cursor:pointer;font-weight:600;
+  }
+  .nav-btn:hover, .admin-btn:hover{background:#475569;}
+
+  /* table */
+  table{
+    width:100%;border-collapse:collapse;border-radius:1rem;overflow:hidden;
+    backdrop-filter:blur(3px);background:#ffffffdd;box-shadow:0 8px 24px rgba(0,0,0,.04);
+  }
+  th,td{padding:.85rem .7rem;text-align:left;border-bottom:1px solid #e2e8f0;font-size:.94rem;}
+  th{background:var(--accent);font-weight:600;}
+  tr:last-child td{border-bottom:none;}
+  tr.priority{background:#fefcbf;} tr:hover{background:#f1f5f9;}
+  .free-yes{color:#16a34a;font-weight:600;} .free-no{color:#dc2626;font-weight:600;}
+
+  .delete-btn{
+    background:#dc2626;color:#fff;border:none;border-radius:.4rem;padding:.25rem .6rem;font-size:.85rem;cursor:pointer;
+  }
+  .delete-btn:hover{background:#a81c1c;}
+
+  @media(max-width:600px){th,td{font-size:.8rem;padding:.6rem .5rem;}}
+
+  <!-- inside <style> of dashboard.html … find the existing rule: -->
+.nav-btn, .admin-btn{
+  display:inline-block;
+  margin:0 0 2rem 0;
+  padding:.55rem 1rem;
+  background:#64748b;
+  color:#fff;
+  text-decoration:none;
+  border:none;
+  border-radius:.55rem;
+  cursor:pointer;
+  font-weight:600;
+}
+
+/* ✨ NEW: push the admin button to the right edge */
+.admin-btn{
+  float:right;          /* aligns it to the right side of the page */
+}
+</style>
+</head>
+<body>
+<h1>Padel Players – Dashboard</h1>
+
+<!-- navigation back to form -->
+<a href="index.html" class="nav-btn">&laquo; Home</a>
+<!-- admin login / logout -->
+<button id="adminBtn" class="admin-btn">Admin Login</button>
+
+<table id="playersTable">
+  <thead><tr id="headerRow"></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const STORAGE_KEY="padelPlayers", ADMIN_FLAG_K="padelIsAdmin", ADMIN_PASS="padel123";
+const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>[...p.querySelectorAll(s)];
+const tbody=$("#playersTable tbody"), adminBtn=$("#adminBtn");
+
+let isAdmin=JSON.parse(localStorage.getItem(ADMIN_FLAG_K)??"false");
+let players=JSON.parse(localStorage.getItem(STORAGE_KEY)??"{}");
+
+/* normalise */
+Object.values(players).forEach(p=>{
+  p.playedLastWeek=!!(typeof p.playedLastWeek==="boolean"?p.playedLastWeek:String(p.playedLastWeek).toLowerCase()==="yes");
+  p.freeThisWeek  =!!(typeof p.freeThisWeek==="boolean"?p.freeThisWeek:String(p.freeThisWeek).toLowerCase()!=="no");
+  p.datePlayed    =p.datePlayed||"";
+});
+const savePlayers=()=>localStorage.setItem(STORAGE_KEY,JSON.stringify(players));
+const saveAdmin  =()=>localStorage.setItem(ADMIN_FLAG_K,JSON.stringify(isAdmin));
+
+function render(){
+  $("#headerRow").innerHTML=`
+    <th>Name</th><th>Games Played</th><th>Played Last Week</th>
+    <th>Free This Week</th><th>Date Played</th>${isAdmin?'<th>Actions</th>':""}`;
+  const sorted=Object.values(players).sort((a,b)=>{
+    const lw=Number(a.playedLastWeek)-Number(b.playedLastWeek); if(lw) return lw;
+    const g=a.gamesPlayed-b.gamesPlayed; if(g) return g;
+    const da=a.datePlayed?new Date(a.datePlayed):new Date(0);
+    const db=b.datePlayed?new Date(b.datePlayed):new Date(0);
+    return da-db; // older first
+  });
+  tbody.innerHTML="";
+  sorted.forEach(p=>{
+    const tr=document.createElement("tr");
+    if(!p.playedLastWeek) tr.classList.add("priority");
+    tr.innerHTML=`
+      <td>${p.name}</td><td>${p.gamesPlayed}</td>
+      <td>${p.playedLastWeek?"Yes":"No"}</td>
+      <td class="${p.freeThisWeek?"free-yes":"free-no"}">${p.freeThisWeek?"Yes":"No"}</td>
+      <td>${p.datePlayed||"—"}</td>
+      ${isAdmin?`<td><button class="delete-btn" data-name="${p.name}">Delete</button></td>`:""}`;
+    tbody.appendChild(tr);
+  });
+  if(isAdmin){
+    $$(".delete-btn").forEach(btn=>{
+      btn.onclick=()=>{const n=btn.dataset.name;
+        if(confirm(`Delete player "${n}"?`)){delete players[n];savePlayers();render();}
+      };
+    });
+  }
+  adminBtn.textContent=isAdmin?"Logout Admin":"Admin Login";
+}
+adminBtn.addEventListener("click",()=>{
+  if(isAdmin){isAdmin=false;saveAdmin();render();}
+  else{
+    const pass=prompt("Enter admin password:");
+    if(pass===ADMIN_PASS){isAdmin=true;saveAdmin();render();}
+    else if(pass!==null) alert("Incorrect password");
+  }
+});
+render();
+</script>
+</body>
+</html>
